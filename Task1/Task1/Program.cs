@@ -84,7 +84,7 @@ namespace Task1
                 .CreateRegressionExperiment(120)
                 .Execute(trainingDataView, labelColumnName: @"fare_amount");
 
-            // STEP 3: Evaluate the model and print metrics
+            // Evaluate the model and print metrics
             Console.WriteLine("===== Evaluating model's accuracy with test data =====");
             RunDetail<RegressionMetrics> best = experimentResult.BestRun;
             ITransformer trainedModel = best.Model;
@@ -103,7 +103,7 @@ namespace Task1
             Console.WriteLine($"*       RMS loss:      {metrics.RootMeanSquaredError:#.##}");
             Console.WriteLine($"*************************************************");
 
-            // STEP 4: Save/persist the trained model to a .ZIP file
+            // Save/persist the trained model to a .ZIP file
             mlContext.Model.Save(trainedModel, trainingDataView.Schema, ModelPath);
 
             Console.WriteLine("The model is saved to {0}", ModelPath);
