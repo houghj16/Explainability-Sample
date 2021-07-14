@@ -79,9 +79,9 @@ namespace Task1
         {
             // Run AutoML regression experiment
             Console.WriteLine("=============== Training the model ===============");
-            Console.WriteLine($"Running AutoML regression experiment for 120 seconds...");
+            Console.WriteLine($"Running AutoML regression experiment for 30 seconds...");
             ExperimentResult<RegressionMetrics> experimentResult = mlContext.Auto()
-                .CreateRegressionExperiment(120)
+                .CreateRegressionExperiment(30)
                 .Execute(trainingDataView, labelColumnName: @"fare_amount");
 
             // Evaluate the model and print metrics
@@ -145,7 +145,42 @@ namespace Task1
 
         private static void CalculatePermutationFeatureImportance(MLContext mlContext, IDataView trainingDataView, TransformerChain<ITransformer> trainedModel)
         {
+            // Extract the trainer (last transformer in the model)
+            var linearPredictor = (ISingleFeaturePredictionTransformer<object>)trainedModel.LastTransformer;
 
+            // Transform data (make predictions)
+            IDataView transformedData = trainedModel.Transform(trainingDataView);
+
+            // Get labels for feature importance
+            VBuffer<ReadOnlyMemory<char>> nameBuffer = default;
+            transformedData.Schema["Features"].Annotations.GetValue("SlotNames", ref nameBuffer); // NOTE: The column name "Features" needs to match the featureColumnName used in the trainer, the name "SlotNames" is always the same regardless of trainer.
+            var featureColumnNames = nameBuffer.DenseValues().ToList();
+
+            // Calculate Feature Permutation
+            ImmutableArray<RegressionMetricsStatistics> permutationMetrics =
+                                            mlContext
+                                                .Regression.PermutationFeatureImportance(predictionTransformer: linearPredictor,
+                                                                                         data: transformedData,
+                                                                                         labelColumnName: @"fare_amount",
+                                                                                         numberOfExamplesToUse: 100, permutationCount: 51);
+
+            // Format feature importance output
+            Console.WriteLine("Feature\tPFI");
+
+            var featureImportanceMetrics =
+                permutationMetrics
+                .Select((metric, index) => new { index, metric.RSquared })
+                .OrderByDescending(myFeatures => Math.Abs(myFeatures.RSquared.Mean));
+
+
+            var featureNames = new List<string>();
+            var featurePFI = new List<double>();
+            foreach (var feature in featureImportanceMetrics)
+            {
+                featureNames.Add($"{featureColumnNames[feature.index],-20}");
+                featurePFI.Add(feature.RSquared.Mean);
+                Console.WriteLine($"{featureColumnNames[feature.index],-20}|\t{feature.RSquared.Mean}");
+            }
         }
     }
 }
